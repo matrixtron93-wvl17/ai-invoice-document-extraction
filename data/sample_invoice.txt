@@ -1,0 +1,42 @@
+INVOICE
+
+Invoice Number: INV-2026-001
+Invoice Date: September 14, 2026
+Due Date: September 30, 2026
+
+Vendor:
+Automation Solutions Inc.
+123 Business Avenue
+Makati City, Philippines
+
+Bill To:
+ABC Digital Services
+456 Technology Street
+Taguig City, Philippines
+
+Items:
+
+1. AI Automation Development
+   Quantity: 1
+   Unit Price: PHP 45,000.00
+   Total: PHP 45,000.00
+
+2. API Integration Service
+   Quantity: 2
+   Unit Price: PHP 12,500.00
+   Total: PHP 25,000.00
+
+3. Monthly Support
+   Quantity: 1
+   Unit Price: PHP 8,000.00
+   Total: PHP 8,000.00
+
+Subtotal: PHP 78,000.00
+Tax: PHP 9,360.00
+Total Amount: PHP 87,360.00
+
+Payment Terms:
+Payment due within 15 days.
+
+Notes:
+Thank you for your business.
