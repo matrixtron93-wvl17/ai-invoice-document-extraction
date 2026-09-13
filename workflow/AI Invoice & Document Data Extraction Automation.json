@@ -1,0 +1,459 @@
+{
+  "name": "AI Invoice & Document Data Extraction Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const text = item.json.content?.parts?.[0]?.text || '';\n\n  const cleaned = text\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n\n  let result;\n\n  try {\n    result = JSON.parse(cleaned);\n  } catch (error) {\n    result = {\n      invoice_number: '',\n      invoice_date: '',\n      due_date: '',\n      vendor_name: '',\n      vendor_address: '',\n      customer_name: '',\n      customer_address: '',\n      subtotal: 0,\n      tax: 0,\n      total_amount: 0,\n      currency: '',\n      payment_terms: '',\n      items: [],\n      parsing_error: true,\n      parsing_error_message: error.message\n    };\n  }\n\n  return {\n    json: result\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -144
+      ],
+      "id": "f8d68c3b-df58-4f4d-998a-fd7ddbdb4739",
+      "name": "Parse AI Invoice Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const data = item.json;\n\n  const errors = [];\n\n  // Required fields\n  if (!data.invoice_number) errors.push('Missing invoice number');\n  if (!data.invoice_date) errors.push('Missing invoice date');\n  if (!data.vendor_name) errors.push('Missing vendor name');\n  if (!data.customer_name) errors.push('Missing customer name');\n\n  // Numeric validation\n  if (Number(data.subtotal) < 0) errors.push('Invalid subtotal');\n  if (Number(data.tax) < 0) errors.push('Invalid tax');\n  if (Number(data.total_amount) < 0) errors.push('Invalid total amount');\n\n  // Total calculation\n  const calculatedTotal =\n    Number(data.subtotal || 0) + Number(data.tax || 0);\n\n  const totalDifference =\n    Number(data.total_amount || 0) - calculatedTotal;\n\n  if (Math.abs(totalDifference) > 0.01) {\n    errors.push('Subtotal + tax does not match total amount');\n  }\n\n  const validationStatus =\n    errors.length === 0 ? 'Valid' : 'Invalid';\n\n  return {\n    json: {\n      ...data,\n      calculated_total: calculatedTotal,\n      total_difference: totalDifference,\n      validation_status: validationStatus,\n      validation_errors: errors\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        -144
+      ],
+      "id": "c9552909-a0cf-4c89-811e-3ac95fd20b7c",
+      "name": "Validate Extracted Data"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "invoices",
+          "mode": "list",
+          "cachedResultName": "invoices"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "invoice_number": "={{ $json.invoice_number }}",
+            "invoice_date": "={{ DateTime.fromFormat($json.invoice_date, 'MMMM d, yyyy').toFormat('yyyy-MM-dd') }}",
+            "due_date": "={{ DateTime.fromFormat($json.due_date, 'MMMM d, yyyy').toFormat('yyyy-MM-dd') }}",
+            "vendor_name": "={{ $json.vendor_name }}",
+            "vendor_address": "={{ $json.vendor_address }}",
+            "customer_name": "={{ $json.customer_name }}",
+            "customer_address": "={{ $json.customer_address }}",
+            "subtotal": "={{ Number($json.subtotal) }}",
+            "tax": "={{ Number($json.tax) }}",
+            "total_amount": "={{ Number($json.total_amount) }}",
+            "currency": "={{ $json.currency }}",
+            "payment_terms": "={{ $json.payment_terms }}",
+            "calculated_total": "={{ Number($json.calculated_total) }}",
+            "total_difference": "={{ Number($json.total_difference) }}",
+            "validation_status": "={{ $json.validation_status }}",
+            "items": "={{ { \"items\": $json.items || [] } }}",
+            "validation_errors": "={{ { \"errors\": $json.validation_errors || [] } }}"
+          },
+          "matchingColumns": [
+            "invoice_number"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "vendor_address",
+              "displayName": "vendor_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "customer_address",
+              "displayName": "customer_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "total_amount",
+              "displayName": "total_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "payment_terms",
+              "displayName": "payment_terms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "items",
+              "displayName": "items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "calculated_total",
+              "displayName": "calculated_total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "total_difference",
+              "displayName": "total_difference",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "validation_status",
+              "displayName": "validation_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "validation_errors",
+              "displayName": "validation_errors",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1248,
+        -144
+      ],
+      "id": "aa2295a2-6825-44c9-be8a-d0c919481377",
+      "name": "Save Invoice to PostgreSQL",
+      "credentials": {
+        "postgres": {
+          "id": "PXmLyA1hJRgG0Jwt",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const data = item.json;\n\n  return {\n    json: {\n      invoice_number: data.invoice_number,\n      vendor_name: data.vendor_name,\n      customer_name: data.customer_name,\n      invoice_date: data.invoice_date,\n      due_date: data.due_date,\n      subtotal: Number(data.subtotal || 0),\n      tax: Number(data.tax || 0),\n      total_amount: Number(data.total_amount || 0),\n      currency: data.currency || '',\n      validation_status: data.validation_status || 'Unknown',\n      processing_status:\n        data.validation_status === 'Valid'\n          ? 'Successfully Processed'\n          : 'Processed with Validation Errors',\n      processed_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -144
+      ],
+      "id": "444680e3-b5c4-46cb-8e6a-2d27463c03c1",
+      "name": "Generate Processing Result"
+    },
+    {
+      "parameters": {
+        "sendTo": "matrixtron93@gmail.com",
+        "subject": "=Invoice Processed: {{ $json.invoice_number }}",
+        "message": "=<h2>Invoice Processing Result</h2>  <p>Hello,</p>  <p>The invoice document has been processed successfully.</p>  <hr>  <p><strong>Invoice Number:</strong> {{ $json.invoice_number }}</p>  <p><strong>Vendor:</strong> {{ $json.vendor_name }}</p>  <p><strong>Customer:</strong> {{ $json.customer_name }}</p>  <p><strong>Invoice Date:</strong> {{ $json.invoice_date }}</p>  <p><strong>Due Date:</strong> {{ $json.due_date }}</p>  <p><strong>Subtotal:</strong> {{ $json.currency }} {{ $json.subtotal }}</p>  <p><strong>Tax:</strong> {{ $json.currency }} {{ $json.tax }}</p>  <p><strong>Total Amount:</strong> {{ $json.currency }} {{ $json.total_amount }}</p>  <p><strong>Validation Status:</strong> {{ $json.validation_status }}</p>  <p><strong>Processing Status:</strong> {{ $json.processing_status }}</p>  <hr>  <p>This notification was automatically generated by the AI Invoice &amp; Document Data Extraction workflow.</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1696,
+        -144
+      ],
+      "id": "531720cf-3a75-48aa-a0c8-57613f107ce4",
+      "name": "Send Processing Notification",
+      "webhookId": "72bab8b0-6e9d-409f-bfd6-f34d36de1a23",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "EUV1JGMD6jkBVLvZ",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an invoice data extraction system.\n\nExtract structured invoice information from the following document text.\n\nReturn ONLY valid JSON using exactly this structure:\n\n{\n  \"invoice_number\": \"\",\n  \"invoice_date\": \"\",\n  \"due_date\": \"\",\n  \"vendor_name\": \"\",\n  \"vendor_address\": \"\",\n  \"customer_name\": \"\",\n  \"customer_address\": \"\",\n  \"subtotal\": 0,\n  \"tax\": 0,\n  \"total_amount\": 0,\n  \"currency\": \"\",\n  \"payment_terms\": \"\",\n  \"items\": [\n    {\n      \"description\": \"\",\n      \"quantity\": 0,\n      \"unit_price\": 0,\n      \"total\": 0\n    }\n  ]\n}\n\nRules:\n- Extract values only from the document text.\n- Do not invent or assume information.\n- Use numbers for quantity, unit_price, subtotal, tax, and total_amount.\n- Do not include currency symbols inside numeric fields.\n- Preserve the invoice number exactly.\n- Return JSON only.\n- No markdown.\n- No explanation.\n\nDOCUMENT TEXT:\n\n{{ $json.text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        -144
+      ],
+      "id": "5bbe0a09-a9da-414b-8a26-a5ef5dedc828",
+      "name": "AI Invoice Data Extraction",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "p58sHs9rhCniNJBi",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice-upload",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -144
+      ],
+      "id": "31477c23-787e-4986-ad6d-fbf896206a4d",
+      "name": "Receive Document",
+      "webhookId": "6a9c4354-2227-46b5-a21d-29fb3ff17caf"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        -144
+      ],
+      "id": "87878c43-8841-4eb8-beee-f9cb25b5497b",
+      "name": "Extract Document Text"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Parse AI Invoice Result": {
+      "main": [
+        [
+          {
+            "node": "Validate Extracted Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Extracted Data": {
+      "main": [
+        [
+          {
+            "node": "Save Invoice to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Invoice to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Generate Processing Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Processing Result": {
+      "main": [
+        [
+          {
+            "node": "Send Processing Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Invoice Data Extraction": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Invoice Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Document": {
+      "main": [
+        [
+          {
+            "node": "Extract Document Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Document Text": {
+      "main": [
+        [
+          {
+            "node": "AI Invoice Data Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8e83c042-320a-4f77-be97-f4dcebf7fbec",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b5c4c433300af6e6085cbda8f2ac6b56a06d6a231860c257d9d66c9227948b19"
+  },
+  "nodeGroups": [],
+  "id": "epgs1cmD7OldvpFH",
+  "tags": []
+}
